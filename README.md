@@ -1,235 +1,75 @@
-# Self-hosted AI starter kit
+# Self-hosted Business Automations
 
-**Self-hosted AI Starter Kit** is an open-source Docker Compose template designed to swiftly initialize a comprehensive local AI and low-code development environment.
+Three practical business workflow extensions by Hamed Minaei, built on n8n's self-hosted AI starter kit. The pack produces reviewable lead decisions, invoice follow-up drafts and support-ticket routes using synthetic datasets.
 
-![n8n.io - Screenshot](https://raw.githubusercontent.com/n8n-io/self-hosted-ai-starter-kit/main/assets/n8n-demo.gif)
+**Status: portfolio workflow pack.** Policy logic is tested independently; local Docker execution is unavailable. No email, WhatsApp, CRM mutation, payment or external customer action is configured. AI drafting is optional and requires a local Ollama model.
 
-Curated by <https://github.com/n8n-io>, it combines the self-hosted n8n
-platform with a curated list of compatible AI products and components to
-quickly get started with building self-hosted AI workflows.
+## Architecture
 
-> [!TIP]
-> [Read the announcement](https://blog.n8n.io/self-hosted-ai/)
+| Layer | Responsibility |
+| --- | --- |
+| `policy/*.js` | Testable, deterministic business decisions |
+| `examples/*.json` | Fictional datasets with fixed dates and demo identifiers |
+| `scripts/build-workflows.mjs` | Reproducibly embeds those policies and datasets into n8n JSON |
+| `workflows/*.json` | Importable inactive n8n workflows |
+| `compose.portfolio.yml` | Standalone localhost n8n/PostgreSQL/Ollama setup |
 
-### What’s included
+The original starter-kit Compose file and examples are retained unchanged for attribution. Use the standalone portfolio Compose file; do not merge it with the original port mappings.
 
-✅ [**Self-hosted n8n**](https://n8n.io/) - Low-code platform with over 400
-integrations and advanced AI components
+## Features
 
-✅ [**Ollama**](https://ollama.com/) - Cross-platform LLM platform to install
-and run the latest local LLMs
+1. **Lead qualification:** validates budget/timeline, computes an explicit score, routes to sales or nurture review, and optionally requests a local AI discovery draft.
+2. **Invoice aging:** calculates overdue days against a fixed input date. Paid invoices close; disputed invoices go to a human without a reminder draft; unpaid overdue invoices produce an unsent review draft.
+3. **Support triage:** English/Arabic routing with human-only rules for refund, complaint, payment and discount topics. Model output cannot override those rules or authorize delivery.
 
-✅ [**Qdrant**](https://qdrant.tech/) - Open-source, high performance vector
-store with an comprehensive API
-
-✅ [**PostgreSQL**](https://www.postgresql.org/) -  Workhorse of the Data
-Engineering world, handles large amounts of data safely.
-
-### What you can build
-
-⭐️ **AI Agents** for scheduling appointments
-
-⭐️ **Summarize Company PDFs** securely without data leaks
-
-⭐️ **Smarter Slack Bots** for enhanced company communications and IT operations
-
-⭐️ **Private Financial Document Analysis** at minimal cost
+Every imported workflow starts with a manual trigger and is inactive. Lead/ticket HTTP nodes call only `http://ollama:11434/api/generate`; missing model responses produce an explicit unavailable draft. There are no delivery nodes. `requires_approval` is review metadata, not an implemented approval UI or permission system.
 
 ## Installation
 
-### Cloning the Repository
+For independent verification, only Node.js 24 is needed:
 
 ```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
+npm test
+npm run build:workflows
 ```
 
-### Running n8n using Docker Compose
-
-#### For Nvidia GPU users
+For n8n, install Docker/Compose. Copy `.env.example` to `.env` and generate three distinct local secrets with `openssl rand -hex 32`. Then:
 
 ```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile gpu-nvidia up
+docker compose -f compose.portfolio.yml up -d
+docker compose -f compose.portfolio.yml exec n8n n8n import:workflow --separate --input=/portfolio-workflows
 ```
 
-> [!NOTE]
-> If you have not used your Nvidia GPU with Docker before, please follow the
-> [Ollama Docker instructions](https://docs.ollama.com/docker).
+Open `http://127.0.0.1:5678`, complete local owner setup, and inspect/import the inactive workflows. Use only included synthetic datasets during review. Model-free invoice logic needs no LLM.
 
-### For AMD GPU users on Linux
+## Configuration
 
-```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile gpu-amd up
-```
+The standalone stack pins n8n 2.43.8 and Ollama 0.40.6, using the PostgreSQL 16 patch-update image family. These are version tags, not immutable digests; image CVEs and image availability must be rechecked before release.
 
-#### For Mac / Apple Silicon users
+Optional drafting uses `llama3.2:3b`. Review its model terms and resource needs before downloading, then run `docker compose -f compose.portfolio.yml exec ollama ollama pull llama3.2:3b`. Allow sufficient local RAM; no latency or throughput claim is made.
 
-If you’re using a Mac with an M1 or newer processor, you can't expose your GPU
-to the Docker instance, unfortunately. There are two options in this case:
+PostgreSQL and Ollama have no published ports. n8n binds localhost only. Ollama has a separate egress network for model downloads. The HTTP-only demo sets `N8N_SECURE_COOKIE=false`; public deployment requires TLS, secure cookies, a separately reviewed network/auth configuration and credential management.
 
-1. Run the starter kit fully on CPU, like in the section "For everyone else"
-   below
-2. Run Ollama on your Mac for faster inference, and connect to that from the
-   n8n instance
+## Security
 
-If you want to run Ollama on your mac, check the
-[Ollama homepage](https://ollama.com/)
-for installation instructions, and run the starter kit as follows:
+No real customer data, live credentials or Smart Visions infrastructure is used. Fixtures contain no deliverable customer contact endpoint. The policies use explicit validation and human-only routing; model text is untrusted, bounded draft text. No node executes that text or sends it to a customer.
 
-```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose up
-```
+A workflow export is not a security boundary. Before replacing fixtures or adding delivery nodes, implement authenticated intake, identity-based approval, deduplication, retention, audit controls and end-to-end delivery tests. Node VM use in tests is solely for trusted repository code, not untrusted-code sandboxing.
 
-##### For Mac users running OLLAMA locally
+Container images and a live Ollama model have not been scanned or run locally because Docker is unavailable. Seven policy/export tests pass, but this is not a production deployment certification.
 
-If you're running OLLAMA locally on your Mac (not in Docker), you need to modify the OLLAMA_HOST environment variable
+## Testing
 
-1. Set OLLAMA_HOST to `host.docker.internal:11434` in your .env file. 
-2. Additionally, after you see "Editor is now accessible via: <http://localhost:5678/>":
+`npm test` runs seven tests covering qualification branches, fixed-date aging, invalid dates, Arabic/English human-only routing, generated n8n Code-node equivalence, connection references, inactive defaults, local-only HTTP targets and model-output constraints. Regeneration is deterministic and CI checks for drift.
 
-    1. Head to <http://localhost:5678/home/credentials>
-    2. Click on "Local Ollama service"
-    3. Change the base URL to "http://host.docker.internal:11434/"
+The GitHub workflow also validates Compose and attempts an import into a disposable n8n container. CI results must be checked separately; authored container tests are not evidence that an import or full execution passed. See [verification](docs/VERIFICATION.md).
 
-#### For everyone else
+## Demo
 
-```bash
-git clone https://github.com/n8n-io/self-hosted-ai-starter-kit.git
-cd self-hosted-ai-starter-kit
-cp .env.example .env # you should update secrets and passwords inside
-docker compose --profile cpu up
-```
+Use Manual demo in each workflow. Expected outcomes: lead scores 100 and 0; one invoice 30 days overdue, one disputed and one paid; refund/Arabic complaint tickets route to a human. Optional local drafts remain unsent and cannot bypass the policy. No hosted demo is claimed.
 
-## ⚡️ Quick start and usage
+## Attribution and licensing
 
-The core of the Self-hosted AI Starter Kit is a Docker Compose file, pre-configured with network and storage settings, minimizing the need for additional installations.
-After completing the installation steps above, simply follow the steps below to get started.
+Based on [n8n-io/self-hosted-ai-starter-kit](https://github.com/n8n-io/self-hosted-ai-starter-kit), baseline `662bd8892476b41d9084417a569cc84013354674`. Original Apache-2.0 LICENSE, README (preserved in `docs/UPSTREAM_README.md`), source and full history are retained. Hamed Minaei added the policies, workflow generator, three workflow exports, datasets, standalone Compose setup, tests and CI.
 
-1. Open <http://localhost:5678/> in your browser to set up n8n. You’ll only
-   have to do this once.
-2. Open the included workflow:
-   <http://localhost:5678/workflow/srOnR8PAY3u4RSwb>
-3. Click the **Chat** button at the bottom of the canvas, to start running the workflow.
-4. If this is the first time you’re running the workflow, you may need to wait
-   until Ollama finishes downloading Llama3.2. You can inspect the docker
-   console logs to check on the progress.
-
-To open n8n at any time, visit <http://localhost:5678/> in your browser.
-
-With your n8n instance, you’ll have access to over 400 integrations and a
-suite of basic and advanced AI nodes such as
-[AI Agent](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent/),
-[Text classifier](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.text-classifier/),
-and [Information Extractor](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.information-extractor/)
-nodes. To keep everything local, just remember to use the Ollama node for your
-language model and Qdrant as your vector store.
-
-> [!NOTE]
-> This starter kit is designed to help you get started with self-hosted AI
-> workflows. While it’s not fully optimized for production environments, it
-> combines robust components that work well together for proof-of-concept
-> projects. You can customize it to meet your specific needs
-
-## Upgrading
-
-* ### For Nvidia GPU setups:
-
-```bash
-docker compose --profile gpu-nvidia pull
-docker compose create && docker compose --profile gpu-nvidia up
-```
-
-* ### For Mac / Apple Silicon users
-
-```bash
-docker compose pull
-docker compose create && docker compose up
-```
-
-* ### For Non-GPU setups:
-
-```bash
-docker compose --profile cpu pull
-docker compose create && docker compose --profile cpu up
-```
-
-## 👓 Recommended reading
-
-n8n is full of useful content for getting started quickly with its AI concepts
-and nodes. If you run into an issue, go to [support](#support).
-
-- [AI agents for developers: from theory to practice with n8n](https://blog.n8n.io/ai-agents/)
-- [Tutorial: Build an AI workflow in n8n](https://docs.n8n.io/advanced-ai/intro-tutorial/)
-- [Langchain Concepts in n8n](https://docs.n8n.io/advanced-ai/langchain/langchain-n8n/)
-- [Demonstration of key differences between agents and chains](https://docs.n8n.io/advanced-ai/examples/agent-chain-comparison/)
-- [What are vector databases?](https://docs.n8n.io/advanced-ai/examples/understand-vector-databases/)
-
-## 🎥 Video walkthrough
-
-- [Installing and using Local AI for n8n](https://www.youtube.com/watch?v=xz_X2N-hPg0)
-
-## 🛍️ More AI templates
-
-For more AI workflow ideas, visit the [**official n8n AI template
-gallery**](https://n8n.io/workflows/categories/ai/). From each workflow,
-select the **Use workflow** button to automatically import the workflow into
-your local n8n instance.
-
-### Learn AI key concepts
-
-- [AI Agent Chat](https://n8n.io/workflows/1954-ai-agent-chat/)
-- [AI chat with any data source (using the n8n workflow too)](https://n8n.io/workflows/2026-ai-chat-with-any-data-source-using-the-n8n-workflow-tool/)
-- [Chat with OpenAI Assistant (by adding a memory)](https://n8n.io/workflows/2098-chat-with-openai-assistant-by-adding-a-memory/)
-- [Use an open-source LLM (via Hugging Face)](https://n8n.io/workflows/1980-use-an-open-source-llm-via-huggingface/)
-- [Chat with PDF docs using AI (quoting sources)](https://n8n.io/workflows/2165-chat-with-pdf-docs-using-ai-quoting-sources/)
-- [AI agent that can scrape webpages](https://n8n.io/workflows/2006-ai-agent-that-can-scrape-webpages/)
-
-### Local AI templates
-
-- [Tax Code Assistant](https://n8n.io/workflows/2341-build-a-tax-code-assistant-with-qdrant-mistralai-and-openai/)
-- [Breakdown Documents into Study Notes with MistralAI and Qdrant](https://n8n.io/workflows/2339-breakdown-documents-into-study-notes-using-templating-mistralai-and-qdrant/)
-- [Financial Documents Assistant using Qdrant and](https://n8n.io/workflows/2335-build-a-financial-documents-assistant-using-qdrant-and-mistralai/) [Mistral.ai](http://mistral.ai/)
-- [Recipe Recommendations with Qdrant and Mistral](https://n8n.io/workflows/2333-recipe-recommendations-with-qdrant-and-mistral/)
-
-## Tips & tricks
-
-### Accessing local files
-
-The self-hosted AI starter kit will create a shared folder (by default,
-located in the same directory) which is mounted to the n8n container and
-allows n8n to access files on disk. This folder within the n8n container is
-located at `/data/shared` -- this is the path you’ll need to use in nodes that
-interact with the local filesystem.
-
-**Nodes that interact with the local filesystem**
-
-- [Read/Write Files from Disk](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.filesreadwrite/)
-- [Local File Trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger/)
-- [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand/)
-
-## 📜 License
-
-This project is licensed under the Apache License 2.0 - see the
-[LICENSE](LICENSE) file for details.
-
-## 💬 Support
-
-Join the conversation in the [n8n Forum](https://community.n8n.io/), where you
-can:
-
-- **Share Your Work**: Show off what you’ve built with n8n and inspire others
-  in the community.
-- **Ask Questions**: Whether you’re just getting started or you’re a seasoned
-  pro, the community and our team are ready to support with any challenges.
-- **Propose Ideas**: Have an idea for a feature or improvement? Let us know!
-  We’re always eager to hear what you’d like to see next.
+The starter kit's Apache license does **not** relicense the n8n engine. n8n's [Sustainable Use License](https://github.com/n8n-io/n8n/blob/master/LICENSE.md) permits uses subject to its own restrictions; do not assume this pack authorizes a white-label or hosted n8n resale product. Enterprise features, model weights and other containers have separate terms. No paid service or commercial license was activated. See [NOTICE](NOTICE).

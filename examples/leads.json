@@ -1,0 +1,4 @@
+[
+  { "id": "DEMO-L1", "company": "Example Workshop", "budget": 1500, "timeline_days": 14, "need": "automation" },
+  { "id": "DEMO-L2", "company": "Fictional Studio", "budget": 200, "timeline_days": 90, "need": "other" }
+]

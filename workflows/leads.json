@@ -1,0 +1,133 @@
+{
+  "id": "portfolio-leads",
+  "name": "Portfolio / leads",
+  "active": false,
+  "nodes": [
+    {
+      "id": "f140a6f6-3557-4b02-8f79-6bd1914e1c62",
+      "name": "Manual demo",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "4c56eada-7ea5-4770-87b8-d3d6cab6bd47",
+      "name": "Synthetic inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{\"id\":\"DEMO-L1\",\"company\":\"Example Workshop\",\"budget\":1500,\"timeline_days\":14,\"need\":\"automation\"},{\"id\":\"DEMO-L2\",\"company\":\"Fictional Studio\",\"budget\":200,\"timeline_days\":90,\"need\":\"other\"}].map(json => ({ json }));"
+      }
+    },
+    {
+      "id": "1abc5461-03ce-4545-829c-ed8fb24f7043",
+      "name": "Business policy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function processRecords(records) {\n  if (records.length > 100) throw new Error('Maximum 100 leads');\n  return records.map((lead) => {\n    if (!lead.id || typeof lead.company !== 'string' || lead.company.length > 160 || !Number.isFinite(lead.budget) || lead.budget < 0 || !Number.isFinite(lead.timeline_days) || lead.timeline_days < 0) throw new Error('Invalid lead');\n    const score = (lead.budget >= 1000 ? 40 : 0) + (lead.timeline_days <= 30 ? 25 : 0) + (['automation', 'website', 'ai'].includes(lead.need) ? 35 : 0);\n    return { id: lead.id, score, route: score >= 60 ? 'sales-review' : 'nurture-review', requires_approval: true, send: false, draft_prompt: `Draft a short discovery reply for the fictional company ${lead.company}. Interest: ${lead.need}. Do not promise work, prices or a booking. Return plain text for a human reviewer.` };\n  });\n}\n\nreturn processRecords($input.all().map(item => item.json)).map(json => ({ json }));"
+      }
+    },
+    {
+      "id": "f0a6ce33-f6b4-4c0f-81b4-48d18be462e3",
+      "name": "Optional local AI draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model: 'llama3.2:3b', prompt: $json.draft_prompt, stream: false}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "5420f8d4-8845-41e9-8fc5-c96b025151bc",
+      "name": "Human review output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const decisions = $('Business policy').all(); return $input.all().map((item, i) => { const decision = decisions[i].json; const humanOnly = decision.route === 'human-required'; const valid = !humanOnly && typeof item.json.response === 'string'; return { json: { ...decision, draft: valid ? item.json.response.slice(0,2000) : null, draft_state: humanOnly ? 'human-required' : valid ? 'ready-for-review' : 'unavailable', requires_approval: true, send: false } }; });"
+      }
+    }
+  ],
+  "connections": {
+    "Manual demo": {
+      "main": [
+        [
+          {
+            "node": "Synthetic inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthetic inputs": {
+      "main": [
+        [
+          {
+            "node": "Business policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Business policy": {
+      "main": [
+        [
+          {
+            "node": "Optional local AI draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optional local AI draft": {
+      "main": [
+        [
+          {
+            "node": "Human review output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none"
+  },
+  "versionId": "e368be5f-b4fc-42ac-85d2-a1de2947227b"
+}

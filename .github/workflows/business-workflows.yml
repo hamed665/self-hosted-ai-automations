@@ -1,0 +1,27 @@
+name: Business workflows
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm test
+      - run: npm run build:workflows
+      - run: git diff --exit-code -- workflows/
+      - name: Validate standalone Compose configuration
+        run: docker compose -f compose.portfolio.yml config -q
+        env:
+          POSTGRES_PASSWORD: synthetic-ci-password-not-a-live-secret
+          N8N_ENCRYPTION_KEY: synthetic-ci-encryption-key-not-for-reuse
+          N8N_USER_MANAGEMENT_JWT_SECRET: synthetic-ci-jwt-secret-not-for-reuse
+      - name: Import workflow files into a disposable n8n process
+        run: docker run --rm -e N8N_ENCRYPTION_KEY=synthetic-import-only-key -v "$PWD/workflows:/portfolio:ro" docker.n8n.io/n8nio/n8n:2.43.8 import:workflow --separate --input=/portfolio

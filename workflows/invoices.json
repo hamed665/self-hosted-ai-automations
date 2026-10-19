@@ -1,0 +1,76 @@
+{
+  "id": "portfolio-invoices",
+  "name": "Portfolio / invoices",
+  "active": false,
+  "nodes": [
+    {
+      "id": "bc832964-ebfa-493a-8bbf-486a78f5fc72",
+      "name": "Manual demo",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "3e543ad3-248f-49e4-8bb7-cd685f04065b",
+      "name": "Synthetic inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{\"id\":\"DEMO-I1\",\"due_date\":\"2026-01-01\",\"as_of\":\"2026-01-31\",\"status\":\"unpaid\"},{\"id\":\"DEMO-I2\",\"due_date\":\"2026-01-15\",\"as_of\":\"2026-01-31\",\"status\":\"disputed\"},{\"id\":\"DEMO-I3\",\"due_date\":\"2026-01-01\",\"as_of\":\"2026-01-31\",\"status\":\"paid\"}].map(json => ({ json }));"
+      }
+    },
+    {
+      "id": "4f3974bb-edcb-48da-8482-7178b62dc0bf",
+      "name": "Business policy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function processRecords(records) {\n  function day(value) {\n    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) throw new Error('Invalid ISO date');\n    const time = Date.parse(`${value}T00:00:00Z`);\n    if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== value) throw new Error('Invalid calendar date');\n    return time;\n  }\n  return records.map(invoice => {\n    if (!invoice.id || !['paid', 'unpaid', 'disputed'].includes(invoice.status)) throw new Error('Invalid invoice');\n    const overdue_days = Math.max(0, Math.floor((day(invoice.as_of) - day(invoice.due_date)) / 86400000));\n    const route = invoice.status === 'paid' ? 'closed' : invoice.status === 'disputed' ? 'human-review' : overdue_days > 0 ? 'reminder-review' : 'not-due';\n    return { id: invoice.id, overdue_days, route, requires_approval: route !== 'closed', send: false, draft: route === 'reminder-review' ? `Draft only: invoice ${invoice.id} is ${overdue_days} days overdue as of ${invoice.as_of}. Please verify the balance before contacting anyone.` : null };\n  });\n}\n\nreturn processRecords($input.all().map(item => item.json)).map(json => ({ json }));"
+      }
+    }
+  ],
+  "connections": {
+    "Manual demo": {
+      "main": [
+        [
+          {
+            "node": "Synthetic inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthetic inputs": {
+      "main": [
+        [
+          {
+            "node": "Business policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none"
+  },
+  "versionId": "9cd12866-8263-4ca5-88da-b25f14da2597"
+}

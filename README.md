@@ -1,5 +1,11 @@
 # Self-hosted Business Automations
 
+**[Hamed Minaei](https://github.com/hamed665) · Project maintainer & integration engineer**
+
+**My engineering scope:** Lead qualification, invoice follow-up and multilingual support triage workflows.
+
+[My contributions & implementation evidence](MY_CONTRIBUTIONS.md) · [Implementation PR](https://github.com/hamed665/self-hosted-ai-automations/pull/1) · [Architecture](#architecture) · [Testing](#testing)
+
 Three practical business workflow extensions by Hamed Minaei, built on n8n's self-hosted AI starter kit. The pack produces reviewable lead decisions, invoice follow-up drafts and support-ticket routes using synthetic datasets.
 
 **Status: portfolio workflow pack.** Policy logic is tested independently; local Docker execution is unavailable. No email, WhatsApp, CRM mutation, payment or external customer action is configured. AI drafting is optional and requires a local Ollama model.
